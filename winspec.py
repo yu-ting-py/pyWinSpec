@@ -142,9 +142,9 @@ class SpeFile(object):
             self._data = np.rollaxis(self._data, 2, 1)
 
             # flip data
-            if all([self.reversed == True, self.adc == '100 KHz']):
+            if all([self.reversed == True, self.adc_rate == '100 KHz']):
                 pass
-            elif any([self.reversed == True, self.adc == '100 KHz']):
+            elif any([self.reversed == True, self.adc_rate == '100 KHz']):
                 self._data = self._data[:, ::-1, :]
                 log.debug('flipped data because of nonstandard ADC setting ' +\
                         'or reversed setting')
@@ -193,11 +193,20 @@ class SpeFile(object):
         xcalib_valid = struct.unpack('?', xcalib.calib_valid)
 
         if xcalib_valid:
-            xcalib_order, = struct.unpack('>B', xcalib.polynom_order) # polynomial order
-            px = xcalib.polynom_coeff[:xcalib_order+1]
-            px = np.array(px[::-1]) # reverse coefficients to use numpy polyval
-            pixels = np.arange(1, self.header.xdim + 1)
-            px = np.polyval(px, pixels)
+            if self.xaxis_label=='Raman shift [cm -1]': # for Raman spectra
+                xcalib_order, = struct.unpack('>B', xcalib.polynom_order) # polynomial order
+                px = xcalib.polynom_coeff[:xcalib_order+1]
+                px = np.array(px[::-1]) # reverse coefficients to use numpy polyval
+                pixels = np.arange(1, self.header.xdim + 1)
+                px = np.polyval(px, pixels)
+                px = (1/xcalib.laser_position-1/px)*(10**7) # calibrate to wavenumber
+                
+            else:
+                xcalib_order, = struct.unpack('>B', xcalib.polynom_order) # polynomial order
+                px = xcalib.polynom_coeff[:xcalib_order+1]
+                px = np.array(px[::-1]) # reverse coefficients to use numpy polyval
+                pixels = np.arange(1, self.header.xdim + 1)
+                px = np.polyval(px, pixels)
         else:
             px = np.arange(1, self.header.xdim + 1)
 
